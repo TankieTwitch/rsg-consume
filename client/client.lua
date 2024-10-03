@@ -9,7 +9,7 @@ end
 -----------------------
 -- eating
 -----------------------
-RegisterNetEvent('rex-consume:client:eat', function(itemName)
+RegisterNetEvent('rsg-consume:client:eat', function(itemName)
     if isBusy then return end
     if not IsPedOnMount(cache.ped) and not IsPedInAnyVehicle(cache.ped) then
         isBusy = true
@@ -23,10 +23,10 @@ RegisterNetEvent('rex-consume:client:eat', function(itemName)
         Wait(5000)
         DeleteObject(itemInHand)
         ClearPedTasks(cache.ped)
-        TriggerServerEvent("RSGCore:Server:SetMetaData", 'hunger', RSGCore.Functions.GetPlayerData().metadata['hunger'] + Config.Consumables.Eat[itemName].hunger)
-        TriggerServerEvent("RSGCore:Server:SetMetaData", 'thirst', RSGCore.Functions.GetPlayerData().metadata['thirst'] + Config.Consumables.Eat[itemName].thirst)
+        TriggerServerEvent('rsg-consume:server:addHunger', RSGCore.Functions.GetPlayerData().metadata.hunger + Config.Consumables.Eat[itemName].hunger)
+        TriggerServerEvent('rsg-consume:server:addThirst', RSGCore.Functions.GetPlayerData().metadata.thirst + Config.Consumables.Eat[itemName].thirst)
         TriggerServerEvent('hud:server:RelieveStress', Config.Consumables.Eat[itemName].stress)
-        TriggerServerEvent('rex-consume:server:removeitem', Config.Consumables.Eat[itemName].item, 1)
+        TriggerServerEvent('rsg-consume:server:removeitem', Config.Consumables.Eat[itemName].item, 1)
         LocalPlayer.state:set("inv_busy", false, true)
         isBusy = false
     end
@@ -35,7 +35,7 @@ end)
 -----------------------
 -- drinking
 -----------------------
-RegisterNetEvent('rex-consume:client:drink', function(itemName)
+RegisterNetEvent('rsg-consume:client:drink', function(itemName)
     if isBusy then return end
     if not IsPedOnMount(cache.ped) and not IsPedInAnyVehicle(cache.ped) then
         isBusy = true
@@ -52,10 +52,10 @@ RegisterNetEvent('rex-consume:client:drink', function(itemName)
         Wait(5000)
         DeleteObject(itemInHand)
         ClearPedTasks(cache.ped)
-        TriggerServerEvent("RSGCore:Server:SetMetaData", 'hunger', RSGCore.Functions.GetPlayerData().metadata['hunger'] + Config.Consumables.Drink[itemName].hunger)
-        TriggerServerEvent("RSGCore:Server:SetMetaData", 'thirst', RSGCore.Functions.GetPlayerData().metadata['thirst'] + Config.Consumables.Drink[itemName].thirst)
+        TriggerServerEvent('rsg-consume:server:addHunger', RSGCore.Functions.GetPlayerData().metadata.hunger + Config.Consumables.Drink[itemName].hunger)
+        TriggerServerEvent('rsg-consume:server:addThirst', RSGCore.Functions.GetPlayerData().metadata.thirst + Config.Consumables.Drink[itemName].thirst)
         TriggerServerEvent('hud:server:RelieveStress', Config.Consumables.Drink[itemName].stress)
-        TriggerServerEvent('rex-consume:server:removeitem', Config.Consumables.Drink[itemName].item, 1)
+        TriggerServerEvent('rsg-consume:server:removeitem', Config.Consumables.Drink[itemName].item, 1)
         LocalPlayer.state:set("inv_busy", false, true)
         isBusy = false
     end

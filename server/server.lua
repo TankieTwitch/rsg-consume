@@ -18,13 +18,34 @@ for k, _ in pairs(Config.Consumables.Drink) do
     end)
 end
 
+-----------------------
+-- update hunger
+-----------------------
+RegisterNetEvent('rsg-consume:server:addHunger', function(amount)
+	print(amount)
+    local Player = RSGCore.Functions.GetPlayer(source)
+    if not Player then return end
+    Player.Functions.SetMetaData('hunger', amount)
+    TriggerClientEvent('hud:client:UpdateHunger', source, amount)
+end)
+
+-----------------------
+-- update thirst
+-----------------------
+RegisterNetEvent('rsg-consume:server:addThirst', function(amount)
+    local Player = RSGCore.Functions.GetPlayer(source)
+    if not Player then return end
+    Player.Functions.SetMetaData('thirst', amount)
+    TriggerClientEvent('hud:client:UpdateThirst', source, amount)
+end)
+
 ---------------------------------------------
 -- remove item
 ---------------------------------------------
-RegisterServerEvent('rex-consume:server:removeitem', function(item, amount)
+RegisterServerEvent('rsg-consume:server:removeitem', function(item, amount)
     local src = source
     local Player = RSGCore.Functions.GetPlayer(src)
     if not Player then return end
     Player.Functions.RemoveItem(item, amount)
-    TriggerClientEvent('inventory:client:ItemBox', src, RSGCore.Shared.Items[item], 'remove', amount)
+    TriggerClientEvent('rsg-inventory:client:ItemBox', src, RSGCore.Shared.Items[item], 'remove', amount)
 end)
