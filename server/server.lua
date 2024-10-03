@@ -5,7 +5,7 @@ local RSGCore = exports['rsg-core']:GetCoreObject()
 -----------------------
 for k, _ in pairs(Config.Consumables.Eat) do
     RSGCore.Functions.CreateUseableItem(k, function(source, item)
-        TriggerClientEvent('rex-consume:client:eat', source, item.name)
+        TriggerClientEvent('rsg-consume:client:eat', source, item.name)
     end)
 end
 
@@ -14,7 +14,7 @@ end
 -----------------------
 for k, _ in pairs(Config.Consumables.Drink) do
     RSGCore.Functions.CreateUseableItem(k, function(source, item)
-        TriggerClientEvent('rex-consume:client:drink', source, item.name)
+        TriggerClientEvent('rsg-consume:client:drink', source, item.name)
     end)
 end
 
@@ -22,7 +22,6 @@ end
 -- update hunger
 -----------------------
 RegisterNetEvent('rsg-consume:server:addHunger', function(amount)
-	print(amount)
     local Player = RSGCore.Functions.GetPlayer(source)
     if not Player then return end
     Player.Functions.SetMetaData('hunger', amount)
