@@ -9,13 +9,6 @@ Config.Consumables = {
             stress = 5,
             propname = 'p_bread_14_ab_s_a'
         },
-        ['chocolate_bar'] = {
-            item = 'chocolate_bar',
-            hunger = 10,
-            thirst = 0,
-            stress = 10,
-            propname = 'p_bread_14_ab_s_a'
-        },
     },
     Drink = { -- default drink items
         ['water'] = {
