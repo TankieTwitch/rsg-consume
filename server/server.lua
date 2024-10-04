@@ -24,6 +24,9 @@ end
 RegisterNetEvent('rsg-consume:server:addHunger', function(amount)
     local Player = RSGCore.Functions.GetPlayer(source)
     if not Player then return end
+    if amount > 100 then
+        amount = 100
+    end
     Player.Functions.SetMetaData('hunger', amount)
     TriggerClientEvent('hud:client:UpdateHunger', source, amount)
 end)
@@ -34,6 +37,9 @@ end)
 RegisterNetEvent('rsg-consume:server:addThirst', function(amount)
     local Player = RSGCore.Functions.GetPlayer(source)
     if not Player then return end
+    if amount > 100 then
+        amount = 100
+    end
     Player.Functions.SetMetaData('thirst', amount)
     TriggerClientEvent('hud:client:UpdateThirst', source, amount)
 end)
