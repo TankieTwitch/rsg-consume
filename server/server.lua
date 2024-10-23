@@ -19,6 +19,15 @@ for k, _ in pairs(Config.Consumables.Drink) do
 end
 
 -----------------------
+-- stew
+-----------------------
+for k, _ in pairs(Config.Consumables.Stew) do
+    RSGCore.Functions.CreateUseableItem(k, function(source, item)
+        TriggerClientEvent('rsg-consume:client:stew', source, item.name)
+    end)
+end
+
+-----------------------
 -- update hunger
 -----------------------
 RegisterNetEvent('rsg-consume:server:addHunger', function(amount)
