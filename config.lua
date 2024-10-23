@@ -19,4 +19,13 @@ Config.Consumables = {
             propname = 'p_bottlebeer01a'
         },
     },
+    Stew = { -- default stew items
+        ['stew'] = {
+            item = 'stew',
+            hunger = 50,
+            thirst = 25,
+            stress = 20,
+            propname = 'p_bowl04x_stew'
+       },
+    },
 }
