@@ -94,3 +94,24 @@ RegisterNetEvent("rsg-consume:client:stew", function(itemName)
         isBusy = not isBusy
     end
 end)
+
+-------------------------
+---- Hot Drinks
+-------------------------
+RegisterNetEvent("rsg-consume:client:drinkcoffee", function(itemName)
+    if isBusy then
+        return
+    else
+        isBusy = not isBusy
+        sleep = 5000
+        SetCurrentPedWeapon(PlayerPedId(), GetHashKey("weapon_unarmed"))
+        local kopi = CreateObject("P_MUGCOFFEE01X", GetEntityCoords(PlayerPedId()), true, true, false, false, true)
+        Citizen.InvokeNative(0x669655FFB29EF1A9, kopi, 0, "CTRL_cupFill", 1.0)
+        TaskItemInteraction_2(PlayerPedId(), GetHashKey("CONSUMABLE_COFFEE"), kopi, GetHashKey("P_MUGCOFFEE01X_PH_R_HAND"), GetHashKey("DRINK_COFFEE_HOLD"), 1, 0, -1)
+        TriggerServerEvent("RSGCore:Server:SetMetaData", "thirst", RSGCore.Functions.GetPlayerData().metadata.thirst + Config.Consumables.Hotdrinks[itemName].thirst)
+        TriggerServerEvent('hud:server:RelieveStress', math.random(10, 20))
+        TriggerServerEvent('rsg-consume:server:removeitem', Config.Consumables.Hotdrinks[itemName].item, 1)
+       
+        isBusy = not isBusy
+    end
+end)
