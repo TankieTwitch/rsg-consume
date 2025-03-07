@@ -28,4 +28,15 @@ Config.Consumables = {
             propname = 'p_bowl04x_stew'
        },
     },
+    Hotdrinks = { -- default hot drink items
+        
+        ['coffee'] = {
+            item = 'coffee',
+            hunger = 0,
+            thirst = 25,
+            stress = 20,
+        },
+    },
 }
+
+

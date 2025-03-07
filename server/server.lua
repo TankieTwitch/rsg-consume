@@ -19,6 +19,15 @@ for k, _ in pairs(Config.Consumables.Drink) do
 end
 
 -----------------------
+-- hot drinks
+-----------------------
+for k, _ in pairs(Config.Consumables.Hotdrinks) do
+    RSGCore.Functions.CreateUseableItem(k, function(source, item)
+        TriggerClientEvent('rsg-consume:client:drinkcoffee', source, item.name)
+    end)
+end
+
+-----------------------
 -- stew
 -----------------------
 for k, _ in pairs(Config.Consumables.Stew) do
