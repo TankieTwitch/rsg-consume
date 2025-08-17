@@ -1,87 +1,92 @@
 local RSGCore = exports['rsg-core']:GetCoreObject()
 local isBusy = false
 
--- Alcohol system variables
+-- Alcohol Variables
 local alcoholCount = 0
 local effectActive = false
 
+-- Helper function to load animation dictionaries safely
 function loadAnimDict(dict, anim)
     while not HasAnimDictLoaded(dict) do Wait(0) RequestAnimDict(dict) end
     return dict
 end
 
--- Principal thread to manage alcohol effects
+-- Main Alcohol Management Thread
 CreateThread(function()
     while true do
         Wait(10)
-        
         if alcoholCount > 0 then
+            -- Gradually decrease alcohol level over time
             Wait(Config.AlcoholSystem.DecreaseInterval)
             alcoholCount = math.max(0, alcoholCount - Config.AlcoholSystem.DecreaseAmount)
-            
-            -- Pass out condition
+
+            -- CASE 1: PLAYER PASSES OUT
             if alcoholCount > Config.AlcoholSystem.PassOutThreshold then
                 lib.notify(Config.AlcoholEffects.PassOutNotification)
-                
-                -- Vomit 
-                local dict = loadAnimDict('amb_misc@world_human_vomit@male_a@idle_b')
-                TaskPlayAnim(cache.ped, dict, "idle_f", 8.0, -8.0, -1, 31, 0, true, 0, false, 0, false)
-                RemoveAnimDict(dict)
+
+                -- Animations sequence
+                local dictVomit = loadAnimDict('amb_misc@world_human_vomit@male_a@idle_b')
+                TaskPlayAnim(cache.ped, dictVomit, "idle_f", 8.0, -8.0, -1, 31, 0, true, 0, false, 0, false)
                 Wait(Config.AlcoholEffects.VomitDuration)
-                
                 ClearPedTasks(cache.ped)
-                
-                -- Sleeping + FX
-                local dict2 = loadAnimDict('amb_rest@world_human_sleep_ground@arm@male_b@idle_b')
-                TaskPlayAnim(cache.ped, dict2, 'idle_f', 8.0, -8.0, -1, 1, 0, true, false, false)
-                RemoveAnimDict(dict2)
-                
+                RemoveAnimDict(dictVomit)
+
+                local dictSleep = loadAnimDict('amb_rest@world_human_sleep_ground@arm@male_b@idle_b')
+                TaskPlayAnim(cache.ped, dictSleep, 'idle_f', 8.0, -8.0, -1, 1, 0, true, false, false)
                 Wait(Config.AlcoholEffects.SleepDuration)
+                RemoveAnimDict(dictSleep)
+
+                -- Fade to black sequence
                 AnimpostfxPlay(Config.AlcoholEffects.PassOutEffect)
                 DoScreenFadeOut(Config.AlcoholEffects.FadeOutDuration)
                 Wait(Config.AlcoholEffects.FadeOutDuration)
-                
-                -- Smart wake up
+
+                ClearPedTasks(cache.ped)
+                Citizen.InvokeNative(0x58F7DB5BD8FA2288, cache.ped)
+
+                -- Hangover/Groggy State Application
+                alcoholCount = 0
+                AnimpostfxPlay(Config.AlcoholEffects.GroggyEffectName)
+                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.95)
+
+                -- Wake-up sequence
                 AnimpostfxPlay(Config.AlcoholEffects.WakeUpEffect)
                 DoScreenFadeIn(Config.AlcoholEffects.FadeInDuration)
                 Wait(Config.AlcoholEffects.FadeInDuration)
-                
-                alcoholCount = Config.AlcoholSystem.WakeUpLevel -- not at 0 to avoid immediate pass out again
-                AnimpostfxStop(Config.AlcoholEffects.WakeUpEffect)
-                ClearPedTasks(cache.ped)
-                Citizen.InvokeNative(0x58F7DB5BD8FA2288, cache.ped)
-                
+                AnimpostfxStop(Config.AlcoholEffects.WakeUpEffect)          
+                lib.notify(Config.AlcoholEffects.WakeUpNotification)
+
+                -- Wait for the hangover to end
+                Wait(Config.AlcoholEffects.GroggyDuration)
+
+                -- Final cleanup
+                AnimpostfxStop(Config.AlcoholEffects.GroggyEffectName)
+                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
+
                 if effectActive then
                     AnimpostfxStop(Config.AlcoholEffects.DrunkEffectName)
                     effectActive = false
                 end
-                
-                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
-                
-            -- Drunk
+
+                lib.notify(Config.AlcoholEffects.SoberNotification)
+
+            -- CASE 2: PLAYER IS DRUNK
             elseif alcoholCount > Config.AlcoholSystem.DrunkThreshold then
-                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.95) -- drunk
-                
+                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.95)
                 if not effectActive then
                     AnimpostfxPlay(Config.AlcoholEffects.DrunkEffectName)
                     effectActive = true
                     lib.notify(Config.AlcoholEffects.DrunkNotification)
                 end
-                Wait(2000)
-                
-            -- Sober
+
+            -- CASE 3: PLAYER IS BECOMING SOBER
             else
-                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0) -- not drunk
-                
+                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
                 if effectActive then
                     AnimpostfxStop(Config.AlcoholEffects.DrunkEffectName)
                     effectActive = false
-                    
-                    if alcoholCount == 0 then
-                        lib.notify(Config.AlcoholEffects.SoberNotification)
-                    end
+                    lib.notify(Config.AlcoholEffects.SoberNotification)
                 end
-                Wait(5000)
             end
         else
             Wait(2000)
@@ -120,7 +125,7 @@ RegisterNetEvent('rsg-consume:client:eat', function(itemName)
 end)
 
 -----------------------
--- drinking (Modifed for alcohol)
+-- drinking (MODIFIED with alcohol system)
 -----------------------
 RegisterNetEvent('rsg-consume:client:drink', function(itemName)
     if isBusy then return end
@@ -148,20 +153,20 @@ RegisterNetEvent('rsg-consume:client:drink', function(itemName)
     LocalPlayer.state:set("inv_busy", false, true)
     isBusy = false
     
-    -- Alcohol Level Management
+    -- ALCOHOL MANAGEMENT
     local drinkConfig = Config.Consumables.Drink[itemName]
     if drinkConfig.alcohol then
         local oldAlcohol = alcoholCount
         if drinkConfig.alcohol > 0 then
             alcoholCount = math.min(Config.AlcoholSystem.MaxAlcoholLevel, alcoholCount + drinkConfig.alcohol)
         else
-            alcoholCount = math.max(0, alcoholCount + drinkConfig.alcohol) -- negative values reduce alcohol
+            alcoholCount = math.max(0, alcoholCount + drinkConfig.alcohol)
         end
         
-        -- -- Notification avec alcoolémie
+        -- Notification alcohol level (debug)
         -- lib.notify({
         --     title = '🍺 ' .. itemName,
-        --     description = itemName .. ' consommé\nAlcool: ' .. alcoholCount .. '/' .. Config.AlcoholSystem.DrunkThreshold,
+        --     description = itemName .. ' consumed\nAlcohol: ' .. alcoholCount .. '/' .. Config.AlcoholSystem.DrunkThreshold,
         --     type = alcoholCount >= Config.AlcoholSystem.DrunkThreshold and 'warning' or 'inform',
         --     duration = 3000,
         --     position = 'bottom-right'
@@ -171,24 +176,26 @@ RegisterNetEvent('rsg-consume:client:drink', function(itemName)
     TriggerServerEvent('rsg-consume:server:removeitem', drinkConfig.item, 1)
     TriggerEvent('hud:client:UpdateHunger', LocalPlayer.state.hunger + drinkConfig.hunger)
     TriggerEvent('hud:client:UpdateThirst', LocalPlayer.state.thirst + drinkConfig.thirst)
-    TriggerEvent('hud:client:RelieveStress', drinkConfig.stress)
+    if drinkConfig.stress and drinkConfig.stress > 0 then
+        TriggerEvent('hud:client:RelieveStress', drinkConfig.stress)
+    end
     TriggerEvent('rsg-consume:client:onConsume', drinkConfig)
 end)
 
--- Debug command to check alcohol level
-RegisterCommand('checkalcohol', function()
-    print("Alcool: " .. alcoholCount .. "/" .. Config.AlcoholSystem.DrunkThreshold)
-end, false)
--- Debug command to reset alcohol level
-RegisterCommand('sobernow', function()
-    alcoholCount = 0
-    if effectActive then
-        AnimpostfxStop(Config.AlcoholEffects.DrunkEffectName)
-        effectActive = false
-    end
-    Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
-    print("Force Sober")
-end, false)
+-- DEBUG COMMANDS (alcohol)
+-- RegisterCommand('checkalcohol', function()
+--     print("🍺 Alcohol: " .. alcoholCount .. "/" .. Config.AlcoholSystem.DrunkThreshold)
+-- end, false)
+
+-- RegisterCommand('sobernow', function()
+--     alcoholCount = 0
+--     if effectActive then
+--         AnimpostfxStop(Config.AlcoholEffects.DrunkEffectName)
+--         effectActive = false
+--     end
+--     Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
+--     print("🧹 Forced sobriety")
+-- end, false)
 
 -------------------------
 ---- eating stew

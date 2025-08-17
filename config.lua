@@ -18,24 +18,16 @@ Config.Consumables = {
             hunger = 0,
             thirst = 25,
             stress = 5,
-            alcohol = -10,
+            alcohol = -5,
             propname = 'p_bottlebeer01a'
         },
         ['beer'] = {
             item = 'beer',
-            hunger = 0,
+            hunger = -3,
             thirst = 0,
-            stress = 65,
-            alcohol = 8,
+            stress = -10,
+            alcohol = 25,
             propname = 'p_bottlebeer01a'
-        },
-        ['moonshine_jug'] = {
-            item = 'moonshine_jug',
-            hunger = 0,
-            thirst = 0,
-            stress = -45,
-            alcohol = 65,
-            propname = 'p_masonjarmoonshine01x'
         },
     },
     Stew = { -- default stew items
@@ -44,6 +36,7 @@ Config.Consumables = {
             hunger = 50,
             thirst = 25,
             stress = 20,
+            alcohol = -10,
             propname = 'p_bowl04x_stew'
        },
     },
@@ -53,7 +46,7 @@ Config.Consumables = {
             hunger = 0,
             thirst = 25,
             stress = 20,
-            alcohol = -10,
+            alcohol = -15,
         },
     },
     Eatcanned = { -- canned food items
@@ -62,50 +55,62 @@ Config.Consumables = {
             hunger = 50,
             thirst = 20,
             stress = 10,
+            alcohol = -3,
             propname = 's_canrigapricots01x',
         },
     },
 }
 
--- Alchol System Configuration
+-- AlcoholSystem Configuration
 Config.AlcoholSystem = {
-    DrunkThreshold = 50,      -- Drunk threshold (when effects start)
-    PassOutThreshold = 200,   -- Stage where player passes out
-    WakeUpLevel = 55,         -- Level upon waking up (just below drunk threshold)
+    DrunkThreshold = 50,      -- Threshold to be considered drunk
+    PassOutThreshold = 200,   -- Threshold to pass out
+    WakeUpLevel = 55,         -- Alcohol level upon waking up (just below the drunk threshold)
     DecreaseAmount = 1,       -- Points removed per cycle
-    DecreaseInterval = 5000,  -- Decrease interval (ms)
-    MaxAlcoholLevel = 500,    -- Maximum level (safety)
+    DecreaseInterval = 5000,  -- Decrement interval (in ms)
+    MaxAlcoholLevel = 500,    -- Maximum alcohol level (safety)
 }
 
--- Visual Effects Configuration
 Config.AlcoholEffects = {
-    DrunkEffect = true,
-    DrunkEffectName = "PlayerDrunk01",
-    PassOutEffect = "PlayerDrunk01_PassOut",
-    WakeUpEffect = "PlayerWakeUpDrunk",
-    VomitDuration = 10000,
-    SleepDuration = 30000,
-    FadeOutDuration = 10000,
-    FadeInDuration = 10000,
-    
-    -- Notifications
+    -- Visual Effects Configuration
+    DrunkEffect = true,                                 -- Enable or disable the drunk post-fx effect
+    DrunkEffectName = "PlayerDrunk01",                  -- The name of the visual effect for being drunk
+    PassOutEffect = "PlayerDrunk01_PassOut",            -- The name of the visual effect for passing out
+    WakeUpEffect = "PlayerWakeUpDrunk",                 -- The name of the visual effect for waking up
+    GroggyEffectName = "PlayerHealthPoorCS",            -- The visual effect for the hangover/groggy state
+
+    -- Timings & Durations (in milliseconds)
+    GroggyDuration = 15000,                             -- How long the hangover state lasts after waking up (ms)
+    VomitDuration = 10000,                              -- How long the vomit animation plays (ms)
+    SleepDuration = 20000,                              -- How long the character sleeps on the ground (ms)
+    FadeOutDuration = 10000,                            -- Duration of the screen fading to black (ms)
+    FadeInDuration = 10000,                             -- Duration of the screen fading back in (ms)
+
+    -- Notifications (Translated to English)
     DrunkNotification = {
         title = '🍺 Drunk',
-        description = 'You feel drunk...',
+        description = 'You start feeling tipsy...',
         type = 'inform',
         duration = 3000,
         position = 'top-right'
     },
     PassOutNotification = {
-        title = '💀 Fainting',
-        description = 'You pass out!',
+        title = '💀 Feeling Unwell',
+        description = 'You don’t feel so good...',
         type = 'error',
         duration = 5000,
         position = 'top-right'
     },
+    WakeUpNotification = {
+        title = '🤕 Rough Awakening',
+        description = 'You wake up with a terrible headache...',
+        type = 'inform',
+        duration = 5000,
+        position = 'top-right'
+    },
     SoberNotification = {
-        title = '✨ Recovery',
-        description = 'You regain your senses.',
+        title = '✨ Recovered',
+        description = 'You feel clear-headed again.',
         type = 'success',
         duration = 2000,
         position = 'top-right'
