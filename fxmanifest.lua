@@ -19,6 +19,10 @@ server_scripts {
     'server/versionchecker.lua'
 }
 
+files {
+    "shared.lua",
+}  
+
 dependencies {
     'rsg-core',
     'ox_lib',

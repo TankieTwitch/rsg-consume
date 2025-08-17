@@ -1,3 +1,4 @@
+local config = require 'shared'
 ---@type table
 local isBusy = false
 ---@type number
@@ -84,40 +85,40 @@ end
 ---Handles the full pass-out sequence for the player.
 ---@param ped number The player ped.
 local function handlePassOut(ped)
-    lib.notify(Config.AlcoholEffects.PassOutNotification)
+    lib.notify(config.AlcoholEffects.PassOutNotification)
 
-    playAnim(ped, 'amb_misc@world_human_vomit@male_a@idle_b', 'idle_f', 31, Config.AlcoholEffects.VomitDuration)
+    playAnim(ped, 'amb_misc@world_human_vomit@male_a@idle_b', 'idle_f', 31, config.AlcoholEffects.VomitDuration)
     ClearPedTasks(ped)
 
-    playAnim(ped, 'amb_rest@world_human_sleep_ground@arm@male_b@idle_b', 'idle_f', 1, Config.AlcoholEffects.SleepDuration)
+    playAnim(ped, 'amb_rest@world_human_sleep_ground@arm@male_b@idle_b', 'idle_f', 1, config.AlcoholEffects.SleepDuration)
 
-    applyEffect(Config.AlcoholEffects.PassOutEffect)
-    DoScreenFadeOut(Config.AlcoholEffects.FadeOutDuration)
-    Wait(Config.AlcoholEffects.FadeOutDuration)
+    applyEffect(config.AlcoholEffects.PassOutEffect)
+    DoScreenFadeOut(config.AlcoholEffects.FadeOutDuration)
+    Wait(config.AlcoholEffects.FadeOutDuration)
 
     ClearPedTasks(ped)
     Citizen.InvokeNative(0x58F7DB5BD8FA2288, ped)
 
     alcoholCount = 0
-    applyEffect(Config.AlcoholEffects.GroggyEffectName)
+    applyEffect(config.AlcoholEffects.GroggyEffectName)
     setDrunkEffect(ped, 0.95)
 
-    applyEffect(Config.AlcoholEffects.WakeUpEffect)
-    DoScreenFadeIn(Config.AlcoholEffects.FadeInDuration)
-    Wait(Config.AlcoholEffects.FadeInDuration)
-    stopEffect(Config.AlcoholEffects.WakeUpEffect)
-    lib.notify(Config.AlcoholEffects.WakeUpNotification)
+    applyEffect(config.AlcoholEffects.WakeUpEffect)
+    DoScreenFadeIn(config.AlcoholEffects.FadeInDuration)
+    Wait(config.AlcoholEffects.FadeInDuration)
+    stopEffect(config.AlcoholEffects.WakeUpEffect)
+    lib.notify(config.AlcoholEffects.WakeUpNotification)
 
-    Wait(Config.AlcoholEffects.GroggyDuration)
-    stopEffect(Config.AlcoholEffects.GroggyEffectName)
+    Wait(config.AlcoholEffects.GroggyDuration)
+    stopEffect(config.AlcoholEffects.GroggyEffectName)
     setDrunkEffect(ped, 0.0)
 
     if effectActive then
-        stopEffect(Config.AlcoholEffects.DrunkEffectName)
+        stopEffect(config.AlcoholEffects.DrunkEffectName)
         effectActive = false
     end
 
-    lib.notify(Config.AlcoholEffects.SoberNotification)
+    lib.notify(config.AlcoholEffects.SoberNotification)
 end
 
 ---Applies drunk effects to the ped.
@@ -125,9 +126,9 @@ end
 local function handleDrunk(ped)
     setDrunkEffect(ped, 0.95)
     if not effectActive then
-        applyEffect(Config.AlcoholEffects.DrunkEffectName)
+        applyEffect(config.AlcoholEffects.DrunkEffectName)
         effectActive = true
-        lib.notify(Config.AlcoholEffects.DrunkNotification)
+        lib.notify(config.AlcoholEffects.DrunkNotification)
     end
 end
 
@@ -136,9 +137,9 @@ end
 local function handleSober(ped)
     setDrunkEffect(ped, 0.0)
     if effectActive then
-        stopEffect(Config.AlcoholEffects.DrunkEffectName)
+        stopEffect(config.AlcoholEffects.DrunkEffectName)
         effectActive = false
-        lib.notify(Config.AlcoholEffects.SoberNotification)
+        lib.notify(config.AlcoholEffects.SoberNotification)
     end
 end
 
@@ -146,12 +147,12 @@ CreateThread(function()
     while true do
         local ped = getPed()
         if alcoholCount > 0 then
-            Wait(Config.AlcoholSystem.DecreaseInterval)
-            alcoholCount = math.max(0, alcoholCount - Config.AlcoholSystem.DecreaseAmount)
+            Wait(config.AlcoholSystem.DecreaseInterval)
+            alcoholCount = math.max(0, alcoholCount - config.AlcoholSystem.DecreaseAmount)
 
-            if alcoholCount > Config.AlcoholSystem.PassOutThreshold then
+            if alcoholCount > config.AlcoholSystem.PassOutThreshold then
                 handlePassOut(ped)
-            elseif alcoholCount > Config.AlcoholSystem.DrunkThreshold then
+            elseif alcoholCount > config.AlcoholSystem.DrunkThreshold then
                 handleDrunk(ped)
             else
                 handleSober(ped)
@@ -167,13 +168,13 @@ end)
 -- =========================================================================================
 
 ---Handles the full consumption sequence for any item.
----@param itemName string The name of the item being consumed (key in Config.Consumables).
+---@param itemName string The name of the item being consumed (key in config.Consumables).
 ---@param type "Eat"|"Drink"|"Stew"|"Hotdrinks"|"Eatcanned" The type of consumable.
 local function handleConsumption(itemName, type)
-    if isBusy or not Config.Consumables[type][itemName] then return end
+    if isBusy or not config.Consumables[type][itemName] then return end
 
     local ped = getPed()
-    local data = Config.Consumables[type][itemName]
+    local data = config.Consumables[type][itemName]
 
     isBusy = true
     LocalPlayer.state:set("inv_busy", true, true)
@@ -235,7 +236,7 @@ local function handleConsumption(itemName, type)
 
     if data.alcohol then
         if data.alcohol > 0 then
-            alcoholCount = math.min(Config.AlcoholSystem.MaxAlcoholLevel, alcoholCount + data.alcohol)
+            alcoholCount = math.min(config.AlcoholSystem.MaxAlcoholLevel, alcoholCount + data.alcohol)
         else
             alcoholCount = math.max(0, alcoholCount + data.alcohol)
         end

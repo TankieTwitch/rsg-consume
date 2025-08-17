@@ -1,7 +1,7 @@
 -- =========================================================================================
 -- Server-side event registration & item handling
 -- =========================================================================================
-
+local config = require 'shared'
 ---@type table
 local RSGCore = exports['rsg-core']:GetCoreObject()
 
@@ -9,9 +9,9 @@ local RSGCore = exports['rsg-core']:GetCoreObject()
 ---@param category string The category of consumables (e.g., "Eat", "Drink").
 ---@param clientEvent string The client-side event to trigger when the item is used.
 local function registerConsumables(category, clientEvent)
-    if not Config.Consumables[category] then return end
+    if not config.Consumables[category] then return end
 
-    for itemName, _ in pairs(Config.Consumables[category]) do
+    for itemName, _ in pairs(config.Consumables[category]) do
         ---Registers a usable item.
         ---@param source number The source ID of the player who used the item.
         ---@param item table The item data.
