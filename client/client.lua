@@ -1,30 +1,62 @@
+---@type table
 local isBusy = false
+---@type number
 local alcoholCount = 0
+---@type boolean
 local effectActive = false
 
+-- =========================================================================================
+-- Helper Functions
+-- =========================================================================================
 
+---Gets the player's ped.
+---@return number
 local function getPed()
     return cache.ped or PlayerPedId()
 end
 
+---Plays an animation on a ped.
+---@param ped number The ped to play the animation on.
+---@param dict string The animation dictionary.
+---@param anim string The animation name.
+---@param flag number|nil The animation flag. (Default: 1)
+---@param duration number|nil The duration of the animation. (Default: -1 for infinite)
 local function playAnim(ped, dict, anim, flag, duration)
     lib.requestAnimDict(dict)
     TaskPlayAnim(ped, dict, anim, 8.0, -8.0, duration or -1, flag or 1, 0, true, false, false)
     RemoveAnimDict(dict)
 end
 
+---Applies a post-process effect.
+---@param effectName string The name of the effect to apply.
 local function applyEffect(effectName)
     if effectName then AnimpostfxPlay(effectName) end
 end
 
+---Stops a post-process effect.
+---@param effectName string The name of the effect to stop.
 local function stopEffect(effectName)
     if effectName then AnimpostfxStop(effectName) end
 end
 
+---Sets the ped's drunk level for the wobbly walk style.
+---@param ped number The ped to apply the effect to.
+---@param level number The drunk effect level (0.0 to 1.0).
 local function setDrunkEffect(ped, level)
     Citizen.InvokeNative(0x406CCF555B04FAD3, ped, 1, level)
 end
 
+---Creates and attaches a prop to a ped's bone.
+---@param ped number The ped to attach the prop to.
+---@param propName string The name of the prop model.
+---@param boneName string The name of the bone to attach to.
+---@param x number X offset.
+---@param y number Y offset.
+---@param z number Z offset.
+---@param rotX number X rotation.
+---@param rotY number Y rotation.
+---@param rotZ number Z rotation.
+---@return number The created prop object.
 local function attachProp(ped, propName, boneName, x, y, z, rotX, rotY, rotZ)
     local coords = GetEntityCoords(ped)
     local prop = CreateObject(propName, coords.x, coords.y, coords.z, true, false, false)
@@ -36,6 +68,8 @@ local function attachProp(ped, propName, boneName, x, y, z, rotX, rotY, rotZ)
     return prop
 end
 
+---Safely deletes an object, ensuring it exists first.
+---@param obj number The object handle to delete.
 local function safeDelete(obj)
     if DoesEntityExist(obj) then
         DetachEntity(obj, true, true)
@@ -43,7 +77,12 @@ local function safeDelete(obj)
     end
 end
 
+-- =========================================================================================
+-- Alcohol System
+-- =========================================================================================
 
+---Handles the full pass-out sequence for the player.
+---@param ped number The player ped.
 local function handlePassOut(ped)
     lib.notify(Config.AlcoholEffects.PassOutNotification)
 
@@ -81,6 +120,8 @@ local function handlePassOut(ped)
     lib.notify(Config.AlcoholEffects.SoberNotification)
 end
 
+---Applies drunk effects to the ped.
+---@param ped number The player ped.
 local function handleDrunk(ped)
     setDrunkEffect(ped, 0.95)
     if not effectActive then
@@ -90,6 +131,8 @@ local function handleDrunk(ped)
     end
 end
 
+---Stops drunk effects and makes the ped sober.
+---@param ped number The player ped.
 local function handleSober(ped)
     setDrunkEffect(ped, 0.0)
     if effectActive then
@@ -119,7 +162,13 @@ CreateThread(function()
     end
 end)
 
+-- =========================================================================================
+-- Generic Consumption Handler
+-- =========================================================================================
 
+---Handles the full consumption sequence for any item.
+---@param itemName string The name of the item being consumed (key in Config.Consumables).
+---@param type "Eat"|"Drink"|"Stew"|"Hotdrinks"|"Eatcanned" The type of consumable.
 local function handleConsumption(itemName, type)
     if isBusy or not Config.Consumables[type][itemName] then return end
 
@@ -167,7 +216,7 @@ local function handleConsumption(itemName, type)
         taskDuration = 5000
 
     elseif type == "Eatcanned" then
-        prop = attachProp(ped, data.propname, "SKEL_L_Finger00", 0.10, -0.03, 0.02, 20.0, -70.0)   
+        prop = attachProp(ped, data.propname, "SKEL_L_Finger00", 0.10, -0.03, 0.02, 20.0, -70.0)
     elseif type == "Eatcanned" then
         prop = attachProp(ped, data.propname, "SKEL_L_Finger00", 0.10, -0.03, 0.02, 20.0, -70.0, -20.0)
         if not IsPedOnMount(ped) and not IsPedInAnyVehicle(ped) and not IsPedUsingAnyScenario(ped) then
@@ -178,7 +227,6 @@ local function handleConsumption(itemName, type)
             taskDuration = 2750
         end
     end
-
 
     Wait(taskDuration)
     ClearPedTasks(ped)
@@ -207,23 +255,36 @@ local function handleConsumption(itemName, type)
     isBusy = false
 end
 
+-- =========================================================================================
+-- Event bindings
+-- =========================================================================================
 
+---Consumes a food item.
+---@param itemName string The name of the food item.
 RegisterNetEvent('rsg-consume:client:eat', function(itemName)
     handleConsumption(itemName, "Eat")
 end)
 
+---Consumes a drink item.
+---@param itemName string The name of the drink item.
 RegisterNetEvent('rsg-consume:client:drink', function(itemName)
     handleConsumption(itemName, "Drink")
 end)
 
+---Consumes a stew.
+---@param itemName string The name of the stew item.
 RegisterNetEvent('rsg-consume:client:stew', function(itemName)
     handleConsumption(itemName, "Stew")
 end)
 
+---Consumes a hot drink (e.g., coffee).
+---@param itemName string The name of the hot drink item.
 RegisterNetEvent('rsg-consume:client:drinkcoffee', function(itemName)
     handleConsumption(itemName, "Hotdrinks")
 end)
 
+---Consumes a canned food item.
+---@param itemName string The name of the canned food item.
 RegisterNetEvent('rsg-consume:client:eatcanned', function(itemName)
     handleConsumption(itemName, "Eatcanned")
 end)
