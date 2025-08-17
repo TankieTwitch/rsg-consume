@@ -1,7 +1,7 @@
 -- =========================================================================================
 -- Server-side event registration & item handling
 -- =========================================================================================
-local config = require 'shared'
+local config = require 'config'
 ---@type table
 local RSGCore = exports['rsg-core']:GetCoreObject()
 

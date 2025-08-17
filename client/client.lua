@@ -1,4 +1,4 @@
-local config = require 'shared'
+local config = require 'config'
 ---@type table
 local isBusy = false
 ---@type number

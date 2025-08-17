@@ -20,7 +20,7 @@ server_scripts {
 }
 
 files {
-    "shared.lua",
+    "config.lua",
 }  
 
 dependencies {
