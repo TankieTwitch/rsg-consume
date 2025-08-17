@@ -1,92 +1,117 @@
-local RSGCore = exports['rsg-core']:GetCoreObject()
 local isBusy = false
-
--- Alcohol Variables
 local alcoholCount = 0
 local effectActive = false
 
--- Helper function to load animation dictionaries safely
-function loadAnimDict(dict, anim)
-    while not HasAnimDictLoaded(dict) do Wait(0) RequestAnimDict(dict) end
-    return dict
+
+local function getPed()
+    return cache.ped or PlayerPedId()
 end
 
--- Main Alcohol Management Thread
+local function playAnim(ped, dict, anim, flag, duration)
+    lib.requestAnimDict(dict)
+    TaskPlayAnim(ped, dict, anim, 8.0, -8.0, duration or -1, flag or 1, 0, true, false, false)
+    RemoveAnimDict(dict)
+end
+
+local function applyEffect(effectName)
+    if effectName then AnimpostfxPlay(effectName) end
+end
+
+local function stopEffect(effectName)
+    if effectName then AnimpostfxStop(effectName) end
+end
+
+local function setDrunkEffect(ped, level)
+    Citizen.InvokeNative(0x406CCF555B04FAD3, ped, 1, level)
+end
+
+local function attachProp(ped, propName, boneName, x, y, z, rotX, rotY, rotZ)
+    local coords = GetEntityCoords(ped)
+    local prop = CreateObject(propName, coords.x, coords.y, coords.z, true, false, false)
+    AttachEntityToEntity(
+        prop, ped, GetEntityBoneIndexByName(ped, boneName),
+        x, y, z, rotX, rotY, rotZ,
+        true, true, false, true, 1, true
+    )
+    return prop
+end
+
+local function safeDelete(obj)
+    if DoesEntityExist(obj) then
+        DetachEntity(obj, true, true)
+        DeleteObject(obj)
+    end
+end
+
+
+local function handlePassOut(ped)
+    lib.notify(Config.AlcoholEffects.PassOutNotification)
+
+    playAnim(ped, 'amb_misc@world_human_vomit@male_a@idle_b', 'idle_f', 31, Config.AlcoholEffects.VomitDuration)
+    ClearPedTasks(ped)
+
+    playAnim(ped, 'amb_rest@world_human_sleep_ground@arm@male_b@idle_b', 'idle_f', 1, Config.AlcoholEffects.SleepDuration)
+
+    applyEffect(Config.AlcoholEffects.PassOutEffect)
+    DoScreenFadeOut(Config.AlcoholEffects.FadeOutDuration)
+    Wait(Config.AlcoholEffects.FadeOutDuration)
+
+    ClearPedTasks(ped)
+    Citizen.InvokeNative(0x58F7DB5BD8FA2288, ped)
+
+    alcoholCount = 0
+    applyEffect(Config.AlcoholEffects.GroggyEffectName)
+    setDrunkEffect(ped, 0.95)
+
+    applyEffect(Config.AlcoholEffects.WakeUpEffect)
+    DoScreenFadeIn(Config.AlcoholEffects.FadeInDuration)
+    Wait(Config.AlcoholEffects.FadeInDuration)
+    stopEffect(Config.AlcoholEffects.WakeUpEffect)
+    lib.notify(Config.AlcoholEffects.WakeUpNotification)
+
+    Wait(Config.AlcoholEffects.GroggyDuration)
+    stopEffect(Config.AlcoholEffects.GroggyEffectName)
+    setDrunkEffect(ped, 0.0)
+
+    if effectActive then
+        stopEffect(Config.AlcoholEffects.DrunkEffectName)
+        effectActive = false
+    end
+
+    lib.notify(Config.AlcoholEffects.SoberNotification)
+end
+
+local function handleDrunk(ped)
+    setDrunkEffect(ped, 0.95)
+    if not effectActive then
+        applyEffect(Config.AlcoholEffects.DrunkEffectName)
+        effectActive = true
+        lib.notify(Config.AlcoholEffects.DrunkNotification)
+    end
+end
+
+local function handleSober(ped)
+    setDrunkEffect(ped, 0.0)
+    if effectActive then
+        stopEffect(Config.AlcoholEffects.DrunkEffectName)
+        effectActive = false
+        lib.notify(Config.AlcoholEffects.SoberNotification)
+    end
+end
+
 CreateThread(function()
     while true do
-        Wait(10)
+        local ped = getPed()
         if alcoholCount > 0 then
-            -- Gradually decrease alcohol level over time
             Wait(Config.AlcoholSystem.DecreaseInterval)
             alcoholCount = math.max(0, alcoholCount - Config.AlcoholSystem.DecreaseAmount)
 
-            -- CASE 1: PLAYER PASSES OUT
             if alcoholCount > Config.AlcoholSystem.PassOutThreshold then
-                lib.notify(Config.AlcoholEffects.PassOutNotification)
-
-                -- Animations sequence
-                local dictVomit = loadAnimDict('amb_misc@world_human_vomit@male_a@idle_b')
-                TaskPlayAnim(cache.ped, dictVomit, "idle_f", 8.0, -8.0, -1, 31, 0, true, 0, false, 0, false)
-                Wait(Config.AlcoholEffects.VomitDuration)
-                ClearPedTasks(cache.ped)
-                RemoveAnimDict(dictVomit)
-
-                local dictSleep = loadAnimDict('amb_rest@world_human_sleep_ground@arm@male_b@idle_b')
-                TaskPlayAnim(cache.ped, dictSleep, 'idle_f', 8.0, -8.0, -1, 1, 0, true, false, false)
-                Wait(Config.AlcoholEffects.SleepDuration)
-                RemoveAnimDict(dictSleep)
-
-                -- Fade to black sequence
-                AnimpostfxPlay(Config.AlcoholEffects.PassOutEffect)
-                DoScreenFadeOut(Config.AlcoholEffects.FadeOutDuration)
-                Wait(Config.AlcoholEffects.FadeOutDuration)
-
-                ClearPedTasks(cache.ped)
-                Citizen.InvokeNative(0x58F7DB5BD8FA2288, cache.ped)
-
-                -- Hangover/Groggy State Application
-                alcoholCount = 0
-                AnimpostfxPlay(Config.AlcoholEffects.GroggyEffectName)
-                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.95)
-
-                -- Wake-up sequence
-                AnimpostfxPlay(Config.AlcoholEffects.WakeUpEffect)
-                DoScreenFadeIn(Config.AlcoholEffects.FadeInDuration)
-                Wait(Config.AlcoholEffects.FadeInDuration)
-                AnimpostfxStop(Config.AlcoholEffects.WakeUpEffect)          
-                lib.notify(Config.AlcoholEffects.WakeUpNotification)
-
-                -- Wait for the hangover to end
-                Wait(Config.AlcoholEffects.GroggyDuration)
-
-                -- Final cleanup
-                AnimpostfxStop(Config.AlcoholEffects.GroggyEffectName)
-                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
-
-                if effectActive then
-                    AnimpostfxStop(Config.AlcoholEffects.DrunkEffectName)
-                    effectActive = false
-                end
-
-                lib.notify(Config.AlcoholEffects.SoberNotification)
-
-            -- CASE 2: PLAYER IS DRUNK
+                handlePassOut(ped)
             elseif alcoholCount > Config.AlcoholSystem.DrunkThreshold then
-                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.95)
-                if not effectActive then
-                    AnimpostfxPlay(Config.AlcoholEffects.DrunkEffectName)
-                    effectActive = true
-                    lib.notify(Config.AlcoholEffects.DrunkNotification)
-                end
-
-            -- CASE 3: PLAYER IS BECOMING SOBER
+                handleDrunk(ped)
             else
-                Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
-                if effectActive then
-                    AnimpostfxStop(Config.AlcoholEffects.DrunkEffectName)
-                    effectActive = false
-                    lib.notify(Config.AlcoholEffects.SoberNotification)
-                end
+                handleSober(ped)
             end
         else
             Wait(2000)
@@ -94,183 +119,111 @@ CreateThread(function()
     end
 end)
 
------------------------
--- eating
------------------------
-RegisterNetEvent('rsg-consume:client:eat', function(itemName)
-    if isBusy then return end
-    isBusy = true
-    LocalPlayer.state:set("inv_busy", true, true)
-    SetCurrentPedWeapon(cache.ped, GetHashKey("weapon_unarmed"))
-    local pcoords = GetEntityCoords(cache.ped)
-    itemInHand = CreateObject(Config.Consumables.Eat[itemName].propname, pcoords.x, pcoords.y, pcoords.z, true, false, false)
-    AttachEntityToEntity(itemInHand, cache.ped, GetEntityBoneIndexByName(cache.ped, "SKEL_L_Finger01"), 0.04, -0.03, -0.01, 0.0, 19.0, 46.0, true, true, false, true, 1, true)
-    if not IsPedOnMount(cache.ped) and not IsPedInAnyVehicle(cache.ped) and not IsPedUsingAnyScenario(cache.ped) then
-        local dict = loadAnimDict('mech_inventory@eating@multi_bite@sphere_d8-2_sandwich')
-        TaskPlayAnim(cache.ped, dict, 'quick_left_hand', 5.0, 5.0, -1, 31, false, false, false)
-        Wait(5000)
-        ClearPedTasks(cache.ped)
-    elseif IsPedOnMount(cache.ped) or IsPedUsingAnyScenario(cache.ped) then
-        TaskItemInteraction(cache.ped, nil, GetHashKey("EAT_MULTI_BITE_FOOD_SPHERE_D8-2_SANDWICH_QUICK_LEFT_HAND"), true, 0, 0)
-        Wait(4000)
-    end
-    DeleteObject(itemInHand)
-    LocalPlayer.state:set("inv_busy", false, true)
-    isBusy = false
-    TriggerServerEvent('rsg-consume:server:removeitem', Config.Consumables.Eat[itemName].item, 1)
-    TriggerEvent('hud:client:UpdateHunger', LocalPlayer.state.hunger + Config.Consumables.Eat[itemName].hunger)
-    TriggerEvent('hud:client:UpdateThirst', LocalPlayer.state.thirst + Config.Consumables.Eat[itemName].thirst)
-    TriggerEvent('hud:client:RelieveStress', Config.Consumables.Eat[itemName].stress)
-    TriggerEvent('rsg-consume:client:onConsume', Config.Consumables.Eat[itemName])
-end)
 
------------------------
--- drinking (MODIFIED with alcohol system)
------------------------
-RegisterNetEvent('rsg-consume:client:drink', function(itemName)
-    if isBusy then return end
+local function handleConsumption(itemName, type)
+    if isBusy or not Config.Consumables[type][itemName] then return end
+
+    local ped = getPed()
+    local data = Config.Consumables[type][itemName]
+
     isBusy = true
     LocalPlayer.state:set("inv_busy", true, true)
-    SetCurrentPedWeapon(cache.ped, GetHashKey("weapon_unarmed"))
-    local pcoords = GetEntityCoords(cache.ped)
-    local hcoords = GetEntityHeading(cache.ped)
-    itemInHand = CreateObject(Config.Consumables.Drink[itemName].propname, pcoords.x, pcoords.y, pcoords.z, true, false, false)
-    AttachEntityToEntity(itemInHand, cache.ped, GetEntityBoneIndexByName(cache.ped, "PH_R_HAND"), 0.00, 0.00, 0.04, 0.0, 0.0, 0.0, true, true, false, true, 1, true)
-    if not IsPedOnMount(cache.ped) and not IsPedInAnyVehicle(cache.ped) and not IsPedUsingAnyScenario(cache.ped) then
-        local dict = loadAnimDict('mech_inventory@drinking@bottle_cylinder_d1-3_h30-5_neck_a13_b2-5')
-        TaskPlayAnim(cache.ped, dict, 'uncork', 5.0, 5.0, -1, 31, false, false, false)
-        Wait(500)
-        local dict = loadAnimDict('mech_inventory@drinking@bottle_cylinder_d1-3_h30-5_neck_a13_b2-5')
-        TaskPlayAnim(cache.ped, dict, 'chug_a', 5.0, 5.0, -1, 31, false, false, false)
-        Wait(5000)
-        ClearPedTasks(cache.ped)
-    elseif IsPedOnMount(cache.ped) or IsPedUsingAnyScenario(cache.ped) then
-        TaskItemInteraction_2(cache.ped, 1737033966, itemInHand, GetHashKey("p_bottleJD01x_ph_r_hand"), GetHashKey("DRINK_Bottle_Cylinder_d1-55_H18_Neck_A8_B1-8_QUICK_RIGHT_HAND"), true, 0, 0)
-        Citizen.InvokeNative(0x2208438012482A1A, cache.ped, true, true)
-        Wait(4000)
-    end
-    DeleteObject(itemInHand)
-    LocalPlayer.state:set("inv_busy", false, true)
-    isBusy = false
-    
-    -- ALCOHOL MANAGEMENT
-    local drinkConfig = Config.Consumables.Drink[itemName]
-    if drinkConfig.alcohol then
-        local oldAlcohol = alcoholCount
-        if drinkConfig.alcohol > 0 then
-            alcoholCount = math.min(Config.AlcoholSystem.MaxAlcoholLevel, alcoholCount + drinkConfig.alcohol)
+    SetCurrentPedWeapon(ped, `WEAPON_UNARMED`)
+
+    local prop, prop2
+    local taskDuration = 4000
+
+    if type == "Eat" then
+        prop = attachProp(ped, data.propname, "SKEL_L_Finger01", 0.04, -0.03, -0.01, 0.0, 19.0, 46.0)
+        playAnim(ped, 'mech_inventory@eating@multi_bite@sphere_d8-2_sandwich', 'quick_left_hand', 31, -1)
+        taskDuration = 5000
+
+    elseif type == "Drink" then
+        prop = attachProp(ped, data.propname, "PH_R_HAND", 0.0, 0.0, 0.04, 0.0, 0.0, 0.0)
+        if not IsPedOnMount(ped) and not IsPedInAnyVehicle(ped) then
+            playAnim(ped, 'mech_inventory@drinking@bottle_cylinder_d1-3_h30-5_neck_a13_b2-5', 'uncork', 31, 500)
+            playAnim(ped, 'mech_inventory@drinking@bottle_cylinder_d1-3_h30-5_neck_a13_b2-5', 'chug_a', 31, -1)
+            taskDuration = 5000
         else
-            alcoholCount = math.max(0, alcoholCount + drinkConfig.alcohol)
+            TaskItemInteraction_2(ped, 1737033966, prop, `p_bottleJD01x_ph_r_hand`, `DRINK_Bottle_Cylinder_d1-55_H18_Neck_A8_B1-8_QUICK_RIGHT_HAND`, true, 0, 0)
+            taskDuration = 4000
         end
-        
-        -- Notification alcohol level (debug)
-        -- lib.notify({
-        --     title = '🍺 ' .. itemName,
-        --     description = itemName .. ' consumed\nAlcohol: ' .. alcoholCount .. '/' .. Config.AlcoholSystem.DrunkThreshold,
-        --     type = alcoholCount >= Config.AlcoholSystem.DrunkThreshold and 'warning' or 'inform',
-        --     duration = 3000,
-        --     position = 'bottom-right'
-        -- })
-    end
-    
-    TriggerServerEvent('rsg-consume:server:removeitem', drinkConfig.item, 1)
-    TriggerEvent('hud:client:UpdateHunger', LocalPlayer.state.hunger + drinkConfig.hunger)
-    TriggerEvent('hud:client:UpdateThirst', LocalPlayer.state.thirst + drinkConfig.thirst)
-    if drinkConfig.stress and drinkConfig.stress > 0 then
-        TriggerEvent('hud:client:RelieveStress', drinkConfig.stress)
-    end
-    TriggerEvent('rsg-consume:client:onConsume', drinkConfig)
-end)
 
--- DEBUG COMMANDS (alcohol)
--- RegisterCommand('checkalcohol', function()
---     print("🍺 Alcohol: " .. alcoholCount .. "/" .. Config.AlcoholSystem.DrunkThreshold)
--- end, false)
+    elseif type == "Stew" then
+        prop = CreateObject(`p_bowl04x_stew`, GetEntityCoords(ped), true, true, false, false, true)
+        prop2 = CreateObject(`p_spoon01x`, GetEntityCoords(ped), true, true, false, false, true)
+        Citizen.InvokeNative(0x669655FFB29EF1A9, prop, 0, "Stew_Fill", 1.0)
+        Citizen.InvokeNative(0xCAAF2BCCFEF37F77, prop, 20)
+        Citizen.InvokeNative(0xCAAF2BCCFEF37F77, prop2, 82)
+        TaskItemInteraction_2(ped, 599184882, prop, `p_bowl04x_stew_ph_l_hand`, -583731576, 1, 0, 0.0)
+        TaskItemInteraction_2(ped, 599184882, prop2, `p_spoon01x_ph_r_hand`, -583731576, 1, 0, 0.0)
+        Citizen.InvokeNative(0xB35370D5353995CB, ped, -583731576, 1.0)
+        taskDuration = 5000
 
--- RegisterCommand('sobernow', function()
---     alcoholCount = 0
---     if effectActive then
---         AnimpostfxStop(Config.AlcoholEffects.DrunkEffectName)
---         effectActive = false
---     end
---     Citizen.InvokeNative(0x406CCF555B04FAD3, cache.ped, 1, 0.0)
---     print("🧹 Forced sobriety")
--- end, false)
+    elseif type == "Hotdrinks" then
+        prop = CreateObject(`P_MUGCOFFEE01X`, GetEntityCoords(ped), true, true, false, false, true)
+        Citizen.InvokeNative(0x669655FFB29EF1A9, prop, 0, "CTRL_cupFill", 1.0)
+        TaskItemInteraction_2(ped, `CONSUMABLE_COFFEE`, prop, `P_MUGCOFFEE01X_PH_R_HAND`, `DRINK_COFFEE_HOLD`, 1, 0, -1)
+        taskDuration = 5000
 
--------------------------
----- eating stew
--------------------------
-RegisterNetEvent("rsg-consume:client:stew", function(itemName)
-   if isBusy then
-        return
-   else
-        isBusy = true
-        sleep = 5000
-        SetCurrentPedWeapon(cache.ped, GetHashKey("weapon_unarmed"))
-        local bowl = CreateObject("p_bowl04x_stew", GetEntityCoords(cache.ped), true, true, false, false, true)
-        local spoon = CreateObject("p_spoon01x", GetEntityCoords(cache.ped), true, true, false, false, true)
-        Citizen.InvokeNative(0x669655FFB29EF1A9, bowl, 0, "Stew_Fill", 1.0)
-        Citizen.InvokeNative(0xCAAF2BCCFEF37F77, bowl, 20)
-        Citizen.InvokeNative(0xCAAF2BCCFEF37F77, spoon, 82)
-        TaskItemInteraction_2(cache.ped, 599184882, bowl, GetHashKey("p_bowl04x_stew_ph_l_hand"), -583731576, 1, 0, 0.0)
-        TaskItemInteraction_2(cache.ped, 599184882, spoon, GetHashKey("p_spoon01x_ph_r_hand"), -583731576, 1, 0, 0.0)
-        Citizen.InvokeNative(0xB35370D5353995CB, cache.ped, -583731576, 1.0)
-        TriggerServerEvent('rsg-consume:server:removeitem', Config.Consumables.Stew[itemName].item, 1)
-        TriggerEvent('hud:client:UpdateHunger', LocalPlayer.state.hunger + Config.Consumables.Stew[itemName].hunger)
-        TriggerEvent('hud:client:UpdateThirst', LocalPlayer.state.thirst + Config.Consumables.Stew[itemName].thirst)
-        TriggerEvent('hud:client:RelieveStress', Config.Consumables.Stew[itemName].stress)
-        TriggerEvent('rsg-consume:client:onConsume', Config.Consumables.Stew[itemName])
-        isBusy = false
+    elseif type == "Eatcanned" then
+        prop = attachProp(ped, data.propname, "SKEL_L_Finger00", 0.10, -0.03, 0.02, 20.0, -70.0)   
+    elseif type == "Eatcanned" then
+        prop = attachProp(ped, data.propname, "SKEL_L_Finger00", 0.10, -0.03, 0.02, 20.0, -70.0, -20.0)
+        if not IsPedOnMount(ped) and not IsPedInAnyVehicle(ped) and not IsPedUsingAnyScenario(ped) then
+            playAnim(ped, 'mech_inventory@eating@canned_food@cylinder@d8-2_h10-5', 'left_hand', 31, -1)
+            taskDuration = 2750
+        else
+            TaskItemInteraction(ped, nil, `EAT_CANNED_FOOD_CYLINDER@D8-2_H10-5_QUICK_LEFT`, true, 0, 0)
+            taskDuration = 2750
+        end
     end
-end)
 
--------------------------
----- Hot Drinks
--------------------------
-RegisterNetEvent("rsg-consume:client:drinkcoffee", function(itemName)
-    if isBusy then
-        return
-    else
-        isBusy = false
-        sleep = 5000
-        SetCurrentPedWeapon(PlayerPedId(), GetHashKey("weapon_unarmed"))
-        local coffee = CreateObject("P_MUGCOFFEE01X", GetEntityCoords(PlayerPedId()), true, true, false, false, true)
-        Citizen.InvokeNative(0x669655FFB29EF1A9, coffee, 0, "CTRL_cupFill", 1.0)
-        TaskItemInteraction_2(PlayerPedId(), GetHashKey("CONSUMABLE_COFFEE"), coffee, GetHashKey("P_MUGCOFFEE01X_PH_R_HAND"), GetHashKey("DRINK_COFFEE_HOLD"), 1, 0, -1)
-        TriggerServerEvent('rsg-consume:server:removeitem', Config.Consumables.Hotdrinks[itemName].item, 1)
-        TriggerEvent('hud:client:UpdateThirst', LocalPlayer.state.thirst + Config.Consumables.Hotdrinks[itemName].thirst)
-        TriggerEvent('hud:client:RelieveStress', Config.Consumables.Hotdrinks[itemName].stress)
-        TriggerEvent('rsg-consume:client:onConsume', Config.Consumables.Hotdrinks[itemName])
-        isBusy = true
-    end
-end)
 
------------------------
--- eating canned food
------------------------
-RegisterNetEvent('rsg-consume:client:eatcanned', function(itemName)
-    if isBusy then return end
-    isBusy = true
-    LocalPlayer.state:set("inv_busy", true, true)
-    SetCurrentPedWeapon(cache.ped, GetHashKey("weapon_unarmed"))
-    local pcoords = GetEntityCoords(cache.ped)
-    local itemInHand = CreateObject(Config.Consumables.Eatcanned[itemName].propname, pcoords.x, pcoords.y, pcoords.z, true, false, false)
-    AttachEntityToEntity(itemInHand, cache.ped, GetEntityBoneIndexByName(cache.ped, "SKEL_L_Finger00"), 0.10, -0.03, 0.02, 20.0, -70.0, -20.0, true, true, false, true, 1, true) -- changed bone, x,y,z pos, x,y,z rot
-    if not IsPedOnMount(cache.ped) and not IsPedInAnyVehicle(cache.ped) and not IsPedUsingAnyScenario(cache.ped) then
-        local dict = loadAnimDict('mech_inventory@eating@canned_food@cylinder@d8-2_h10-5')
-        TaskPlayAnim(cache.ped, dict, 'left_hand', 5.0, 5.0, -1, 31, false, false, false)
-        Wait(2750)
-        ClearPedTasks(cache.ped)
-    elseif IsPedOnMount(cache.ped) or IsPedUsingAnyScenario(cache.ped) then
-        TaskItemInteraction(cache.ped, nil, GetHashKey("EAT_CANNED_FOOD_CYLINDER@D8-2_H10-5_QUICK_LEFT"), true, 0, 0)
-        Wait(2750)
+    Wait(taskDuration)
+    ClearPedTasks(ped)
+    safeDelete(prop)
+    safeDelete(prop2)
+
+    if data.alcohol then
+        if data.alcohol > 0 then
+            alcoholCount = math.min(Config.AlcoholSystem.MaxAlcoholLevel, alcoholCount + data.alcohol)
+        else
+            alcoholCount = math.max(0, alcoholCount + data.alcohol)
+        end
     end
-    DetachEntity(itemInHand)
+    TriggerServerEvent('rsg-consume:server:removeitem', data.item, 1)
+    if data.hunger then
+        TriggerEvent('hud:client:UpdateHunger', LocalPlayer.state.hunger + data.hunger)
+    end
+    if data.thirst then
+        TriggerEvent('hud:client:UpdateThirst', LocalPlayer.state.thirst + data.thirst)
+    end
+    if data.stress and data.stress > 0 then
+        TriggerEvent('hud:client:RelieveStress', data.stress)
+    end
+    TriggerEvent('rsg-consume:client:onConsume', data)
     LocalPlayer.state:set("inv_busy", false, true)
     isBusy = false
-    TriggerServerEvent('rsg-consume:server:removeitem', Config.Consumables.Eatcanned[itemName].item, 1)
-    TriggerEvent('hud:client:UpdateHunger', LocalPlayer.state.hunger + Config.Consumables.Eatcanned[itemName].hunger)
-    TriggerEvent('hud:client:UpdateThirst', LocalPlayer.state.thirst + Config.Consumables.Eatcanned[itemName].thirst)
-    TriggerEvent('hud:client:RelieveStress', Config.Consumables.Eatcanned[itemName].stress)
-    TriggerEvent('rsg-consume:client:onConsume', Config.Consumables.Eatcanned[itemName])
+end
+
+
+RegisterNetEvent('rsg-consume:client:eat', function(itemName)
+    handleConsumption(itemName, "Eat")
+end)
+
+RegisterNetEvent('rsg-consume:client:drink', function(itemName)
+    handleConsumption(itemName, "Drink")
+end)
+
+RegisterNetEvent('rsg-consume:client:stew', function(itemName)
+    handleConsumption(itemName, "Stew")
+end)
+
+RegisterNetEvent('rsg-consume:client:drinkcoffee', function(itemName)
+    handleConsumption(itemName, "Hotdrinks")
+end)
+
+RegisterNetEvent('rsg-consume:client:eatcanned', function(itemName)
+    handleConsumption(itemName, "Eatcanned")
 end)
